@@ -1,0 +1,109 @@
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
+body { background-color: #f4f7f6; color: #333; }
+
+header {
+    background: linear-gradient(135deg, #0052D4, #4364F7, #6FB1FC);
+    color: white; padding: 15px 20px; text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+header h1 { font-size: 1.5rem; margin-bottom: 5px; }
+
+/* Thanh cảnh báo mất kết nối mạng phía trình duyệt */
+.net-banner {
+    background: #424242; color: #fff; text-align: center;
+    padding: 10px 16px; font-weight: 500;
+}
+.net-banner[hidden] { display: none; }
+
+.container {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+    .container { grid-template-columns: 1fr; padding: 16px; }
+    header h1 { font-size: 1.15rem; }
+}
+
+.card-panel { display: flex; flex-direction: column; gap: 15px; }
+
+.card {
+    background: white; border-radius: 12px; padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.card-title {
+    font-size: 0.9rem; color: #666; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+
+.status-box {
+    padding: 15px; border-radius: 8px; font-weight: bold;
+    text-align: center; font-size: 1.2rem;
+}
+.status-detail { font-size: 0.85rem; font-weight: 400; margin-top: 6px; line-height: 1.35; }
+
+/* Mỗi trạng thái có màu + biểu tượng + chữ, không chỉ dựa vào màu */
+.status-safe      { background-color: #e8f5e9; color: #1b5e20; border: 2px solid #66bb6a; }
+.status-warning   { background-color: #fff3e0; color: #e65100; border: 2px solid #ffb74d; }
+.status-danger    { background-color: #ffebee; color: #b71c1c; border: 2px solid #e57373; }
+.status-sos       { background-color: #c62828; color: #fff;    border: 2px solid #8e0000; animation: pulse 1s infinite; }
+.status-cleared   { background-color: #fff8e1; color: #8d4b00; border: 2px dashed #f9a825; }
+.status-offline,
+.status-nodata,
+.status-verifying { background-color: #eceff1; color: #455a64; border: 2px dashed #90a4ae; }
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(198,40,40,0.6); }
+    70% { box-shadow: 0 0 0 10px rgba(198,40,40,0); }
+    100% { box-shadow: 0 0 0 0 rgba(198,40,40,0); }
+}
+@media (prefers-reduced-motion: reduce) { .status-sos { animation: none; } }
+
+.btn {
+    display: block; width: 100%; text-align: center; padding: 10px; border-radius: 6px;
+    border: none; text-decoration: none; font-weight: bold; font-size: 0.95rem; cursor: pointer;
+}
+.btn[hidden] { display: none; }
+.btn-ack { margin-top: 12px; background: #f9a825; color: #3e2723; }
+.btn-maps { background: #4285F4; color: white; }
+.btn-maps[aria-disabled="true"] { background: #b0bec5; color: #eceff1; pointer-events: none; }
+
+.val-display { font-size: 2.2rem; font-weight: bold; color: #1a237e; }
+.val-display.is-stale { color: #78909c; }
+.hint { font-size: 0.85rem; color: #777; margin-top: 5px; }
+
+.map-wrap { position: relative; }
+#map { height: 550px; width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+@media (max-width: 900px) { #map { height: 420px; } }
+.map-note {
+    position: absolute; left: 12px; bottom: 24px; z-index: 500;
+    background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 6px;
+    font-size: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.15); max-width: calc(100% - 24px);
+}
+.map-note[hidden] { display: none; }
+.map-recenter {
+    position: absolute; right: 12px; top: 12px; z-index: 500;
+    background: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 6px;
+    padding: 6px 10px; font-weight: 500; cursor: pointer;
+}
+
+.info-row { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 0.95rem; }
+.info-row span { color: #555; }
+.info-row strong { color: #111; text-align: right; }
+.c-ok { color: #2e7d32 !important; }
+.c-warn { color: #ef6c00 !important; }
+.c-bad { color: #c62828 !important; }
+.c-muted { color: #78909c !important; }
+
+/* Marker tự vẽ (không cần ảnh ngoài) */
+.dev-marker {
+    width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 12px;
+}
+.dev-marker.m-safe { background: #2e7d32; }
+.dev-marker.m-warning { background: #ef6c00; }
+.dev-marker.m-danger, .dev-marker.m-sos { background: #c62828; }
+.dev-marker.m-gray { background: #78909c; }
