@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiểm thử trình duyệt</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, sans-serif; margin: 16px; background: #0b1020; color: #e6edf7; }
+        h1 { font-size: 1.2rem; }
+        table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 0.9rem; }
+        td, th { border: 1px solid #2a3550; padding: 6px 8px; text-align: left; vertical-align: top; }
+        .pass { color: #22c55e; font-weight: 700; } .fail { color: #ef4444; font-weight: 700; }
+        #frames iframe { width: 1280px; height: 900px; border: 0; position: absolute; left: -10000px; top: 0; }
+        code { font-size: 0.8rem; color: #fca5a5; }
+    </style>
+</head>
+<body>
+    <h1>Kiểm thử js/app.js trên trình duyệt (Firebase giả lập)</h1>
+    <p>Trang này nạp <b>index.html thật</b> trong iframe, chỉ thay Firebase bằng bản giả lập (tests/fake-firebase.js) và dùng tiền tố lưu trữ riêng <code>rp_test_</code>. Không đọc/ghi Firebase thật.</p>
+    <p id="summary">Đang chạy...</p>
+    <table><thead><tr><th>Mã</th><th>Kịch bản</th><th>Kết quả</th><th>Chi tiết</th></tr></thead><tbody id="rows"></tbody></table>
+    <div id="frames"></div>
+
+<script>
+"use strict";
+const PREFIX = "rp_test_";
+const BASE = { waterLevel: 0, sosState: 0, latitude: 20.15, longitude: 105.92, gpsValid: true, lastUpdate: 1, statusText: "AN TOAN" };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let indexHtml = null;
+
+function clearStorage() {
+    Object.keys(localStorage).filter((k) => k.startsWith(PREFIX)).forEach((k) => localStorage.removeItem(k));
+}
+
+// Nạp index.html thật, thay script Firebase bằng bản giả lập, chèn đồng hồ điều khiển được
+async function boot() {
+    if (!indexHtml) indexHtml = await (await fetch("../index.html", { cache: "no-store" })).text();
+    let html = indexHtml;
+    const head = '<head>' +
+        '<script>window.__errors=[];addEventListener("error",function(e){__errors.push(String(e.message))});' +
+        'var __n=Date.now.bind(Date),__off=0;Date.now=function(){return __n()+__off};window.__advance=function(ms){__off+=ms};<\/script>';
+    html = html.replace("<head>", head);
+    html = html.replace(/<script src="https:\/\/www\.gstatic\.com\/firebasejs\/8\.10\.1\/firebase-app\.js"[^>]*><\/script>/, '<script src="tests/fake-firebase.js"><\/script>');
+    html = html.replace(/<script src="https:\/\/www\.gstatic\.com\/firebasejs\/8\.10\.1\/firebase-database\.js"[^>]*><\/script>/, "");
+    html = html.replace('<script src="js/config.js"><\/script>',
+        '<script src="js/config.js"><\/script><script>APP_CONFIG.storagePrefix="' + PREFIX + '";APP_CONFIG.debug=true;<\/script>');
+    // Đường dẫn tương đối của index.html tính từ thư mục gốc → đổi thành "../" (iframe srcdoc dùng URL của trang này)
+    html = html.replace(/(src|href)="(css|js|tests)\//g, '$1="../$2/');
+    if (!html.includes("tests/fake-firebase.js") || !html.includes("APP_CONFIG.debug=true")) throw new Error("Không chèn được Firebase giả lập vào index.html");
+    const f = document.createElement("iframe");
+    document.getElementById("frames").appendChild(f);
+    const loaded = new Promise((r) => (f.onload = r));
+    f.srcdoc = html;
+    await loaded;
+    const w = f.contentWindow;
+    for (let i = 0; i < 100 && !w.__rpDebug; i++) await sleep(50);
+    if (!w.__rpDebug) throw new Error("app.js không khởi động: " + JSON.stringify(w.__errors));
+    w.__frame = f;
+    return w;
+}
+const txt = (w, id) => w.document.getElementById(id).textContent.trim();
+const hidden = (w, id) => w.document.getElementById(id).hidden;
+async function emit(w, path, v) { w.__fb.set(path, v); await sleep(10); }
+async function render(w) { w.__rpDebug.render(); await sleep(10); }
+function check(cond, msg) { if (!cond) throw new Error(msg); }
+function eq(a, b, msg) { if (a !== b) throw new Error(msg + " – nhận \"" + a + "\", mong đợi \"" + b + "\""); }
+
+// Trạm hoạt động bình thường: máy chủ kết nối, LoRa CONNECT, đã nhận 1 gói mới
+async function online(w, data) {
+    await emit(w, ".info/connected", true);
+    await emit(w, "/DeviceStatus/connection", "CONNECT");
+    await emit(w, "/gps", null);
+    await emit(w, "/Monitoring", Object.assign({}, BASE, data, { lastUpdate: 1 }));
+    await emit(w, "/Monitoring", Object.assign({}, BASE, data, { lastUpdate: 2 }));
+}
+
+const TESTS = [
+    ["T00", "Khi chưa có dữ liệu không hiển thị AN TOÀN", async () => {
+        const w = await boot();
+        check(txt(w, "status-text") !== "AN TOÀN", "Đang tải mà hiện AN TOÀN");
+        await emit(w, ".info/connected", true);
+        await emit(w, "/Monitoring", Object.assign({}, BASE));
+        check(txt(w, "status-text") !== "AN TOÀN", "Snapshot đầu (chưa xác minh) mà hiện AN TOÀN");
+        await emit(w, "/Monitoring", Object.assign({}, BASE, { lastUpdate: 2 }));
+        check(txt(w, "status-text") !== "AN TOÀN", "Chưa có node connection mà hiện AN TOÀN");
+        return "Đang tải → " + txt(w, "status-text");
+    }],
+    ["T01", "Thiếu sosState trên giao diện", async () => {
+        const w = await boot();
+        await online(w, { sosState: undefined }); // JSON bỏ trường undefined → node thiếu sosState
+        eq(txt(w, "status-text"), "CHƯA XÁC MINH TÍN HIỆU SOS", "Trạng thái");
+        return txt(w, "status-text");
+    }],
+    ["T04", "SOS đang bật rồi mất Firebase", async () => {
+        const w = await boot();
+        await online(w, { sosState: 1 });
+        eq(txt(w, "status-text"), "CẤP CỨU KHẨN CẤP (SOS)", "Khi online");
+        await emit(w, ".info/connected", false);
+        eq(txt(w, "status-text"), "CẤP CỨU KHẨN CẤP (SOS)", "Khi mất Firebase");
+        eq(txt(w, "kpi-sos"), "1", "KPI SOS");
+        check(!hidden(w, "net-banner"), "Không hiện banner mất kết nối");
+        return txt(w, "status-detail");
+    }],
+    ["T09", "Heartbeat quá hạn → MẤT TÍN HIỆU, khóa chỉ đường", async () => {
+        const w = await boot();
+        await online(w);
+        eq(txt(w, "status-text"), "AN TOÀN", "Ban đầu");
+        eq(w.document.getElementById("gmaps-link").getAttribute("aria-disabled"), "false", "Chỉ đường khi GPS trực tiếp");
+        w.__advance(61000); await render(w);
+        eq(txt(w, "status-text"), "MẤT TÍN HIỆU", "Sau 61 giây");
+        eq(w.document.getElementById("gmaps-link").getAttribute("aria-disabled"), "true", "Chỉ đường phải bị khóa");
+        check(!w.document.getElementById("gmaps-link").hasAttribute("href"), "Link chỉ đường vẫn còn href");
+        check(!hidden(w, "gps-copy"), "Không hiện nút sao chép tọa độ tham khảo");
+        check(txt(w, "map-note").includes("Không dùng làm vị trí cứu hộ"), "Thiếu cảnh báo trên bản đồ");
+        eq(txt(w, "kpi-online"), "0", "KPI online"); eq(txt(w, "kpi-offline"), "1", "KPI offline");
+        w.__advance(700000); await render(w);
+        check(txt(w, "gps-source").includes("QUÁ HẠN"), "GPS phải QUÁ HẠN sau >10 phút");
+        return txt(w, "gps-source");
+    }],
+    ["T15", "localStorage hỏng không làm sập trang, SOS hỏng vẫn giữ", async () => {
+        clearStorage();
+        localStorage.setItem(PREFIX + "water_history", "{{hỏng");
+        localStorage.setItem(PREFIX + "last_valid_pos", '{"lat":999,"lng":1,"at":1}');
+        localStorage.setItem(PREFIX + "activity_log", "[1,2,{\"t\":\"x\"}]");
+        localStorage.setItem(PREFIX + "sos_latch", "{hỏng");
+        const w = await boot();
+        check(!hidden(w, "chart-empty"), "Biểu đồ phải trống khi lịch sử hỏng");
+        check(localStorage.getItem(PREFIX + "last_valid_pos") === null, "Vị trí hỏng chưa bị xóa");
+        await online(w);
+        eq(w.__errors.length, 0, "Có lỗi JS");
+        check(txt(w, "status-text").includes("SOS"), "Chốt SOS hỏng phải được giữ");
+        check(txt(w, "log-list").includes("bị hỏng"), "Không ghi nhật ký dữ liệu hỏng");
+        return txt(w, "status-text");
+    }],
+    ["T16", "Firebase mất kết nối rồi kết nối lại", async () => {
+        const w = await boot();
+        await online(w);
+        const before = w.__fb.count();
+        await emit(w, ".info/connected", false);
+        eq(txt(w, "status-text"), "MẤT KẾT NỐI MÁY CHỦ", "Khi mất kết nối");
+        check(!hidden(w, "net-banner"), "Banner phải hiện");
+        eq(txt(w, "kpi-online"), "0", "KPI online khi mất máy chủ");
+        await emit(w, ".info/connected", true);
+        eq(txt(w, "status-text"), "AN TOÀN", "Sau khi kết nối lại");
+        check(hidden(w, "net-banner"), "Banner phải tắt");
+        eq(w.__fb.count(), before, "Số listener thay đổi");
+        return "listener: " + before + " → " + w.__fb.count();
+    }],
+    ["T17", "Một listener lỗi trong khi listener khác hoạt động", async () => {
+        const w = await boot();
+        await online(w);
+        w.__fb.fail("/DeviceStatus/connection", "PERMISSION_DENIED"); await sleep(10);
+        eq(txt(w, "connection-status"), "LỖI ĐỌC DỮ LIỆU", "Trạng thái LoRa");
+        await emit(w, "/Monitoring", Object.assign({}, BASE, { lastUpdate: 3 }));
+        check(txt(w, "status-text") !== "AN TOÀN", "Node Monitoring cập nhật đã che mất lỗi connection");
+        check(txt(w, "log-list").includes("không có quyền"), "Không ghi nhật ký lỗi quyền");
+        eq(w.__fb.countFor("/DeviceStatus/connection"), 0, "Listener lỗi phải bị hủy");
+        await emit(w, ".info/connected", false);
+        await emit(w, ".info/connected", true);
+        eq(w.__fb.countFor("/DeviceStatus/connection"), 1, "Không gắn lại listener sau khi kết nối lại");
+        await emit(w, "/DeviceStatus/connection", "CONNECT");
+        eq(txt(w, "status-text"), "AN TOÀN", "Sau khi đọc lại được");
+        check(txt(w, "log-list").includes("Đã đọc lại được"), "Không ghi nhật ký khôi phục");
+        w.__fb.fail("/Monitoring", "PERMISSION_DENIED"); await sleep(10);
+        eq(txt(w, "status-text"), "KHÔNG ĐỌC ĐƯỢC DỮ LIỆU", "Lỗi Monitoring");
+        eq(txt(w, "kpi-total"), "0", "KPI thiết bị khi lỗi Monitoring");
+        return "OK";
+    }],
+    ["T20", "KPI khớp trạng thái tổng trên giao diện", async () => {
+        const w = await boot();
+        await online(w);
+        eq(txt(w, "kpi-online"), "1", "SAFE: online");
+        await emit(w, "/DeviceStatus/connection", "DISCONNECT");
+        eq(txt(w, "status-text"), "MẤT TÍN HIỆU", "DISCONNECT");
+        eq(txt(w, "kpi-online"), "0", "DISCONNECT: online"); eq(txt(w, "kpi-offline"), "1", "DISCONNECT: offline");
+        await emit(w, "/DeviceStatus/connection", "??");
+        check(txt(w, "status-text") !== "AN TOÀN", "Giá trị lạ mà AN TOÀN");
+        eq(txt(w, "kpi-online"), "0", "Giá trị lạ: online");
+        eq(txt(w, "kpi-online-sub"), "1 chưa xác minh", "Giá trị lạ: ghi chú");
+        await emit(w, "/DeviceStatus/connection", "CONNECT");
+        await emit(w, "/Monitoring", Object.assign({}, BASE, { waterLevel: 2, lastUpdate: 9 }));
+        eq(txt(w, "kpi-flood"), "1", "Mức 2: nguy cơ ngập");
+        w.__advance(61000); await render(w);
+        check(txt(w, "kpi-flood-sub").includes("dữ liệu cũ"), "KPI ngập không đánh dấu dữ liệu cũ");
+        return "OK";
+    }],
+    ["T21", "Người dùng kéo bản đồ, GPS vẫn cập nhật", async () => {
+        const w = await boot();
+        await online(w);
+        const map = w.__rpDebug.map;
+        map.fire("dragstart");
+        map.setView([21.0, 105.8], 16, { animate: false });
+        await emit(w, "/Monitoring", Object.assign({}, BASE, { latitude: 20.2, longitude: 105.95, lastUpdate: 5 }));
+        const c = map.getCenter();
+        check(Math.abs(c.lat - 21.0) < 1e-6 && Math.abs(c.lng - 105.8) < 1e-6, "Bản đồ bị kéo về thiết bị khi người dùng đang xem chỗ khác");
+        check(!hidden(w, "map-recenter"), "Không hiện nút Về vị trí thiết bị");
+        let mk = null; map.eachLayer((l) => { if (l.getLatLng && l.options && l.options.title === "Trạm cảnh báo lũ") mk = l; });
+        check(mk && Math.abs(mk.getLatLng().lat - 20.2) < 1e-6, "Marker chưa cập nhật vị trí mới");
+        w.document.getElementById("map-recenter").click();
+        let c2 = map.getCenter();
+        for (let i = 0; i < 40 && Math.abs(c2.lat - 20.2) >= 1e-3; i++) { await sleep(50); c2 = map.getCenter(); }
+        check(Math.abs(c2.lat - 20.2) < 1e-3, "Nút Về vị trí thiết bị không hoạt động");
+        return "OK";
+    }],
+    ["T22", "Tải lại trang khi còn SOS chưa xử lý", async () => {
+        clearStorage();
+        let w = await boot();
+        await online(w, { sosState: 1 });
+        eq(txt(w, "status-text"), "CẤP CỨU KHẨN CẤP (SOS)", "Trước khi tải lại");
+        w.__frame.remove();
+        w = await boot();                       // tải lại: giữ localStorage
+        await emit(w, ".info/connected", true);
+        await emit(w, "/DeviceStatus/connection", "CONNECT");
+        await emit(w, "/Monitoring", Object.assign({}, BASE, { sosState: 0, lastUpdate: 1 })); // snapshot cũ
+        eq(txt(w, "status-text"), "ĐÃ GHI NHẬN SOS – CHƯA XÁC MINH", "Sau khi tải lại (snapshot cũ sosState=0)");
+        eq(txt(w, "kpi-sos"), "1", "KPI SOS");
+        check(!hidden(w, "sos-ack-btn"), "Thiếu nút xác nhận");
+        await emit(w, "/Monitoring", Object.assign({}, BASE, { sosState: 0, lastUpdate: 2 })); // gói mới
+        eq(txt(w, "status-text"), "SOS ĐÃ TẮT – CẦN XÁC MINH", "Gói mới sosState=0");
+        w.confirm = () => true;
+        w.document.getElementById("sos-ack-btn").click(); await sleep(10);
+        eq(txt(w, "status-text"), "AN TOÀN", "Sau khi người trực xác nhận");
+        eq(localStorage.getItem(PREFIX + "sos_latch"), null, "Chốt SOS chưa xóa");
+        return "OK";
+    }],
+    ["T24", "Chạy lâu: không nhân listener, không ghi trùng, có giới hạn", async () => {
+        clearStorage();
+        const w = await boot();
+        await online(w);
+        const listenersBefore = w.__fb.count();
+        let packets = 2;
+        for (let i = 3; i < 700; i++) {
+            w.__advance(2000);
+            w.__fb.set("/Monitoring", Object.assign({}, BASE, { waterLevel: i % 4, lastUpdate: i }));
+            packets++;
+            if (i % 25 === 0) { w.__fb.set(".info/connected", false); w.__fb.set(".info/connected", true); }
+        }
+        const histBefore = w.__rpDebug.state.history.length;
+        for (let i = 0; i < 50; i++) w.__fb.set("/Monitoring", Object.assign({}, BASE, { waterLevel: 3, lastUpdate: 699 })); // đọc lại snapshot cũ
+        await render(w);
+        const st = w.__rpDebug.state;
+        eq(w.__fb.count(), listenersBefore, "Số listener");
+        eq(st.history.length, histBefore, "Đọc lại snapshot cũ vẫn ghi thêm lịch sử");
+        check(st.history.length <= w.APP_CONFIG.historyMax, "Lịch sử vượt giới hạn");
+        check(st.log.length <= w.APP_CONFIG.logMax, "Nhật ký vượt giới hạn");
+        for (let i = 1; i < st.log.length; i++) check(!(st.log[i].msg === st.log[i - 1].msg && st.log[i].sev === st.log[i - 1].sev), "Nhật ký trùng liên tiếp: " + st.log[i].msg);
+        for (let i = 1; i < st.history.length; i++) check(st.history[i].t > st.history[i - 1].t, "Lịch sử không tăng dần theo thời gian");
+        check(w.document.querySelectorAll("#log-list li").length <= 60, "Quá nhiều dòng nhật ký trên DOM");
+        check(w.document.querySelectorAll("#alert-list li").length <= 30, "Quá nhiều cảnh báo trên DOM");
+        eq(w.__errors.length, 0, "Có lỗi JS");
+        return packets + " gói; lịch sử " + st.history.length + "/" + w.APP_CONFIG.historyMax + "; nhật ký " + st.log.length + "/" + w.APP_CONFIG.logMax + "; listener " + w.__fb.count();
+    }],
+    ["XSS", "Dữ liệu chứa HTML không được thực thi", async () => {
+        const w = await boot();
+        const evil = '<img src=x onerror="window.__pwned=1">';
+        await online(w, { statusText: evil });
+        await emit(w, "/DeviceStatus/connection", evil);
+        await sleep(50);
+        check(!w.__pwned, "Mã độc đã chạy");
+        check(!w.document.querySelector("img[src='x']"), "Thẻ img bị chèn vào DOM");
+        eq(txt(w, "device-status-text"), evil.slice(0, 80), "statusText phải hiển thị dạng chữ");
+        return "OK";
+    }]
+];
+
+(async () => {
+    const rows = document.getElementById("rows");
+    const results = [];
+    for (const [id, name, fn] of TESTS) {
+        clearStorage();
+        if (id === "T15") { /* T15 tự chuẩn bị localStorage */ }
+        let ok = false, detail = "";
+        try { detail = (await fn()) || ""; ok = true; } catch (e) { detail = e.message; }
+        document.querySelectorAll("#frames iframe").forEach((f) => f.remove());
+        results.push({ id, name, ok, detail });
+        const tr = document.createElement("tr");
+        [id, name, ok ? "ĐẠT" : "KHÔNG ĐẠT", detail].forEach((t, i) => {
+            const td = document.createElement("td");
+            td.textContent = t;
+            if (i === 2) td.className = ok ? "pass" : "fail";
+            tr.appendChild(td);
+        });
+        rows.appendChild(tr);
+    }
+    clearStorage();
+    const pass = results.filter((r) => r.ok).length;
+    document.getElementById("summary").textContent = "Đạt " + pass + "/" + results.length + (pass === results.length ? " – tất cả đạt" : " – có bài KHÔNG ĐẠT");
+    window.__results = results;
+})();
+</script>
+</body>
+</html>

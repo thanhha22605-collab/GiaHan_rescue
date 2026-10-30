@@ -4,21 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hệ Thống Giám Sát Cảnh Báo Lũ Lụt & Cứu Hộ</title>
+    <meta name="theme-color" content="#f4f2ee">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230ea5e9'/%3E%3Cpath d='M6 21c3 0 3-2 5-2s2 2 5 2 3-2 5-2 2 2 5 2M6 26c3 0 3-2 5-2s2 2 5 2 3-2 5-2 2 2 5 2M16 6l8 7h-3v4h-10v-4H8z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
 
     <!-- Leaflet CSS (Bản đồ miễn phí) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
 
     <!-- Google Fonts & FontAwesome Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- Các khối màu phía sau lớp kính (tĩnh) -->
+    <div class="orbs" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
 
     <header>
-        <h1><i class="fa-solid fa-house-flood-water" aria-hidden="true"></i> HỆ THỐNG GIÁM SÁT CẢNH BÁO LŨ LỤT & CỨU HỘ</h1>
-        <p>Cập nhật thời gian thực qua LoRa & Firebase</p>
+        <div class="brand">
+            <div class="brand-logo"><i class="fa-solid fa-house-flood-water" aria-hidden="true"></i></div>
+            <div>
+                <h1>HỆ THỐNG GIÁM SÁT CẢNH BÁO LŨ LỤT & CỨU HỘ</h1>
+                <p>Cập nhật thời gian thực qua LoRa & Firebase</p>
+            </div>
+        </div>
+        <div class="header-meta">
+            <span id="clock" class="clock">--:--:--</span>
+            <span id="live-pill" class="live-pill"><span class="live-dot"></span><span class="pill-prefix">MÁY CHỦ:</span><span id="live-text">ĐANG KẾT NỐI</span></span>
+        </div>
     </header>
 
     <div id="net-banner" class="net-banner" role="alert" hidden>
@@ -26,94 +42,165 @@
         Mất kết nối tới máy chủ Firebase. Dữ liệu bên dưới có thể đã cũ – hệ thống sẽ tự kết nối lại.
     </div>
 
-    <div class="container">
-        <!-- Bảng thông số -->
-        <div class="card-panel">
+    <main class="dash">
 
-            <!-- Trạng thái kết nối LoRa -->
-            <div class="card">
-                <div class="card-title"><i class="fa-solid fa-wifi" aria-hidden="true"></i> Trạng thái trạm thu</div>
-                <div class="info-row">
-                    <span>Kết nối LoRa:</span>
-                    <strong id="connection-status" class="c-muted">ĐANG TẢI...</strong>
+        <!-- Hàng chỉ số tổng quan -->
+        <section class="kpis" aria-label="Chỉ số tổng quan">
+            <div class="kpi" id="kpi-total-card">
+                <div class="kpi-icon"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i></div>
+                <div class="kpi-body"><span class="kpi-label">Thiết bị giám sát</span><strong class="kpi-value" id="kpi-total">--</strong><span class="kpi-sub" id="kpi-total-sub">Đang tải</span></div>
+            </div>
+            <div class="kpi" id="kpi-online-card">
+                <div class="kpi-icon"><i class="fa-solid fa-signal" aria-hidden="true"></i></div>
+                <div class="kpi-body"><span class="kpi-label">Đang online</span><strong class="kpi-value" id="kpi-online">--</strong><span class="kpi-sub" id="kpi-online-sub">Có gói dữ liệu mới</span></div>
+            </div>
+            <div class="kpi" id="kpi-offline-card">
+                <div class="kpi-icon"><i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i></div>
+                <div class="kpi-body"><span class="kpi-label">Mất tín hiệu</span><strong class="kpi-value" id="kpi-offline">--</strong><span class="kpi-sub" id="kpi-offline-sub">Offline / dữ liệu cũ</span></div>
+            </div>
+            <div class="kpi" id="kpi-sos-card">
+                <div class="kpi-icon"><i class="fa-solid fa-bell" aria-hidden="true"></i></div>
+                <div class="kpi-body"><span class="kpi-label">SOS chưa xử lý</span><strong class="kpi-value" id="kpi-sos">--</strong><span class="kpi-sub" id="kpi-sos-sub">Cần tiếp nhận</span></div>
+            </div>
+            <div class="kpi" id="kpi-flood-card">
+                <div class="kpi-icon"><i class="fa-solid fa-water" aria-hidden="true"></i></div>
+                <div class="kpi-body"><span class="kpi-label">Nguy cơ ngập</span><strong class="kpi-value" id="kpi-flood">--</strong><span class="kpi-sub" id="kpi-flood-sub">Từ mức cảnh báo</span></div>
+            </div>
+            <div class="kpi" id="kpi-updated-card">
+                <div class="kpi-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></div>
+                <div class="kpi-body"><span class="kpi-label">Cập nhật cuối</span><strong class="kpi-value kpi-value-sm" id="kpi-updated">--</strong><span class="kpi-sub" id="kpi-updated-sub">Gói dữ liệu mới nhất</span></div>
+            </div>
+        </section>
+
+        <!-- Cột thông tin + bản đồ -->
+        <section class="grid-main">
+            <div class="card-panel">
+
+                <!-- Cảnh báo hệ thống -->
+                <div class="card">
+                    <div class="card-title"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Trạng thái hệ thống</div>
+                    <div id="status-card" class="status-box status-verifying" role="status" aria-live="assertive">
+                        <div><i id="status-icon" class="fa-solid fa-hourglass-half" aria-hidden="true"></i> <span id="status-text">ĐANG TẢI DỮ LIỆU...</span></div>
+                        <div id="status-detail" class="status-detail">Chưa xác minh – không hiển thị "An toàn" khi chưa có dữ liệu.</div>
+                    </div>
+                    <button id="sos-ack-btn" type="button" class="btn btn-ack" hidden>
+                        <i class="fa-solid fa-check" aria-hidden="true"></i> Đã xác minh, bỏ cảnh báo SOS
+                    </button>
                 </div>
-                <div class="info-row">
-                    <span>Nhịp tín hiệu:</span>
-                    <strong id="heartbeat-status" class="c-muted">Đang chờ dữ liệu</strong>
+
+                <!-- Mực nước -->
+                <div class="card">
+                    <div class="card-title"><i class="fa-solid fa-water" aria-hidden="true"></i> Mực nước hiện tại</div>
+                    <div class="val-display" id="water-level">MỨC --</div>
+                    <p class="hint" id="water-note">Mức 0: An toàn | Mức 3: Báo động lũ</p>
+                    <div class="info-row">
+                        <span>Thiết bị báo:</span>
+                        <strong id="device-status-text">--</strong>
+                    </div>
                 </div>
-                <div class="info-row">
-                    <span>Nhận dữ liệu mới lúc:</span>
-                    <strong id="last-seen">--</strong>
+
+                <!-- Trạng thái kết nối LoRa -->
+                <div class="card">
+                    <div class="card-title"><i class="fa-solid fa-wifi" aria-hidden="true"></i> Trạng thái trạm thu</div>
+                    <div class="info-row">
+                        <span>Kết nối LoRa:</span>
+                        <strong id="connection-status" class="c-muted">ĐANG TẢI...</strong>
+                    </div>
+                    <div class="info-row">
+                        <span>Nhịp tín hiệu:</span>
+                        <strong id="heartbeat-status" class="c-muted">Đang chờ dữ liệu</strong>
+                    </div>
+                    <div class="info-row">
+                        <span>Nhận dữ liệu mới lúc:</span>
+                        <strong id="last-seen">--</strong>
+                    </div>
                 </div>
+
+                <!-- Tọa độ GPS -->
+                <div class="card">
+                    <div class="card-title"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Tọa độ GPS Cứu hộ</div>
+                    <div class="info-row">
+                        <span>Vĩ độ (Lat):</span>
+                        <strong id="lat-val">--.------</strong>
+                    </div>
+                    <div class="info-row">
+                        <span>Kinh độ (Lng):</span>
+                        <strong id="lng-val">---.------</strong>
+                    </div>
+                    <div class="info-row">
+                        <span>Trạng thái GPS:</span>
+                        <strong id="gps-status" class="c-muted">Chưa chốt</strong>
+                    </div>
+                    <div class="info-row">
+                        <span>Nguồn vị trí:</span>
+                        <strong id="gps-source">--</strong>
+                    </div>
+                    <div class="info-row">
+                        <span>Ghi nhận lúc:</span>
+                        <strong id="gps-time">--</strong>
+                    </div>
+                    <div class="btn-stack">
+                        <a id="gmaps-link" class="btn btn-maps" target="_blank" rel="noopener noreferrer" aria-disabled="true">
+                            <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> <span id="gmaps-text">Chỉ đường (chưa có vị trí)</span>
+                        </a>
+                        <button id="gps-copy" type="button" class="btn btn-copy" hidden>
+                            <i class="fa-regular fa-copy" aria-hidden="true"></i> Sao chép tọa độ tham khảo
+                        </button>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Cảnh báo hệ thống -->
-            <div class="card">
-                <div class="card-title"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Trạng thái hệ thống</div>
-                <div id="status-card" class="status-box status-verifying" role="status" aria-live="assertive">
-                    <div><i id="status-icon" class="fa-solid fa-hourglass-half" aria-hidden="true"></i> <span id="status-text">ĐANG TẢI DỮ LIỆU...</span></div>
-                    <div id="status-detail" class="status-detail">Chưa xác minh – không hiển thị "An toàn" khi chưa có dữ liệu.</div>
-                </div>
-                <button id="sos-ack-btn" type="button" class="btn btn-ack" hidden>
-                    <i class="fa-solid fa-check" aria-hidden="true"></i> Đã xác minh, bỏ cảnh báo SOS
+            <!-- Bản đồ trực tuyến -->
+            <div class="map-wrap">
+                <div id="map"></div>
+                <div class="map-hud" aria-hidden="true"><i class="fa-solid fa-satellite-dish"></i> BẢN ĐỒ GIÁM SÁT</div>
+                <button id="map-recenter" class="map-recenter" type="button" hidden>
+                    <i class="fa-solid fa-crosshairs" aria-hidden="true"></i> Về vị trí thiết bị
                 </button>
+                <div id="map-note" class="map-note" hidden></div>
             </div>
+        </section>
 
-            <!-- Mực nước -->
-            <div class="card">
-                <div class="card-title"><i class="fa-solid fa-water" aria-hidden="true"></i> Mực nước hiện tại</div>
-                <div class="val-display" id="water-level">MỨC --</div>
-                <p class="hint" id="water-note">Mức 0: An toàn | Mức 3: Báo động lũ</p>
-                <div class="info-row">
-                    <span>Thiết bị báo:</span>
-                    <strong id="device-status-text">--</strong>
+        <!-- Biểu đồ + cảnh báo + nhật ký -->
+        <section class="grid-bottom">
+            <div class="card card-chart">
+                <div class="card-title"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Lịch sử mực nước
+                    <span class="card-title-note">giờ trình duyệt nhận · chỉ lưu trên trình duyệt này</span>
                 </div>
-            </div>
-
-            <!-- Tọa độ GPS -->
-            <div class="card">
-                <div class="card-title"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Tọa độ GPS Cứu hộ</div>
-                <div class="info-row">
-                    <span>Vĩ độ (Lat):</span>
-                    <strong id="lat-val">--.------</strong>
+                <div class="chart-box">
+                    <svg id="chart" role="img" aria-label="Biểu đồ lịch sử mực nước"></svg>
+                    <p id="chart-empty" class="empty">Chưa có gói dữ liệu mới nào được ghi nhận. Biểu đồ sẽ hiện khi thiết bị gửi dữ liệu trong lúc trang đang mở.</p>
                 </div>
-                <div class="info-row">
-                    <span>Kinh độ (Lng):</span>
-                    <strong id="lng-val">---.------</strong>
-                </div>
-                <div class="info-row">
-                    <span>Trạng thái GPS:</span>
-                    <strong id="gps-status" class="c-muted">Chưa chốt</strong>
-                </div>
-                <div class="info-row">
-                    <span>Nguồn vị trí:</span>
-                    <strong id="gps-source">--</strong>
-                </div>
-                <div style="margin-top: 15px;">
-                    <a id="gmaps-link" class="btn btn-maps" href="#" target="_blank" rel="noopener" aria-disabled="true">
-                        <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Chỉ đường bằng Google Maps
-                    </a>
+                <div class="legend">
+                    <span><i class="lg lg-line"></i> Mực nước</span>
+                    <span><i class="lg lg-warn"></i> Ngưỡng cảnh báo</span>
+                    <span><i class="lg lg-bad"></i> Ngưỡng nguy hiểm</span>
                 </div>
             </div>
 
-        </div>
+            <div class="card card-list">
+                <div class="card-title"><i class="fa-solid fa-bell" aria-hidden="true"></i> Cảnh báo mới nhất
+                    <span id="alert-count" class="badge">0</span>
+                </div>
+                <ul id="alert-list" class="feed"></ul>
+                <p id="alert-empty" class="empty">Chưa có cảnh báo.</p>
+            </div>
 
-        <!-- Bản đồ trực tuyến -->
-        <div class="map-wrap">
-            <div id="map"></div>
-            <button id="map-recenter" class="map-recenter" type="button" hidden>
-                <i class="fa-solid fa-crosshairs" aria-hidden="true"></i> Về vị trí thiết bị
-            </button>
-            <div id="map-note" class="map-note" hidden></div>
-        </div>
-    </div>
+            <div class="card card-list">
+                <div class="card-title"><i class="fa-solid fa-list-ul" aria-hidden="true"></i> Nhật ký hoạt động</div>
+                <ul id="log-list" class="feed"></ul>
+                <p id="log-empty" class="empty">Chưa có hoạt động.</p>
+            </div>
+        </section>
+    </main>
 
     <!-- Firebase JS SDK (Phiên bản v8 tương thích dễ dùng) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js" integrity="sha384-v3Z/Xdw1sCeo6M/geW7sn1Lt9obIm7MhAk8laVV+rvYFmzuWDELOiygx7dVte2dX" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js" integrity="sha384-fuqdSwJXSvcAuKu5FbSJcHqHK474liv5ji8tuDnHz1rpfrnuXZPdM0oRaSK6c95L" crossorigin="anonymous"></script>
 
     <!-- Leaflet JS (Bản đồ) -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 
     <script src="js/config.js"></script>
     <script src="js/status.js"></script>

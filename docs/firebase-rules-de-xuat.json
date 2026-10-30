@@ -1,0 +1,30 @@
+{
+  "_ghi_chu": "ĐỀ XUẤT – CHƯA ÁP DỤNG. Thay GATEWAY_UID bằng UID tài khoản Firebase Auth mà gateway dùng để ghi. Nếu gateway đang ghi bằng Database Secret (legacy) thì secret bỏ qua Rules, nên áp dụng file này không làm gateway ngừng ghi. Nếu gateway ghi không xác thực, áp dụng file này SẼ làm gateway ngừng ghi. Xóa trường _ghi_chu trước khi dán vào Firebase Console.",
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "Monitoring": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'GATEWAY_UID'",
+      "waterLevel": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+      "sosState":   { ".validate": "newData.isNumber() || newData.isBoolean()" },
+      "latitude":   { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+      "longitude":  { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+      "gpsValid":   { ".validate": "newData.isBoolean() || newData.isNumber()" },
+      "lastUpdate": { ".validate": "newData.isNumber()" },
+      "statusText": { ".validate": "newData.isString() && newData.val().length <= 80" },
+      "updatedAt":  { ".validate": "newData.isNumber() && newData.val() <= now + 60000" }
+    },
+    "DeviceStatus": {
+      ".read": true,
+      "connection": {
+        ".write": "auth != null && auth.uid === 'GATEWAY_UID'",
+        ".validate": "newData.val() === 'CONNECT' || newData.val() === 'DISCONNECT'"
+      }
+    },
+    "gps": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'GATEWAY_UID'"
+    }
+  }
+}
