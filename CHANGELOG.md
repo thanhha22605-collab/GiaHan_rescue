@@ -8,6 +8,8 @@ Chỉnh web cho khớp firmware thật (trạm phát gửi mỗi 1 giây, trạm
 |---|----------|------|----------|
 | 1 | Thời gian chờ mất nhịp 60 giây → 15 giây | `js/config.js` | Node 24/24, trình duyệt T09, T20 – ĐẠT |
 | 2 | Lịch sử mực nước chỉ ghi khi mức đổi, hoặc 1 điểm mỗi 60 giây (`historySampleMs`). Trước đây ghi mọi gói nên 500 điểm chỉ đủ ~8 phút | `js/config.js`, `js/app.js` | Trình duyệt T25 (mới), T24 – ĐẠT |
+| 3 | Kiểm thử vận hành với dữ liệu đúng như trạm thu v2 ghi (`updatedAt`, giờ máy chủ, DISCONNECT → CONNECT, SOS tự giữ, mất GPS, trạm thu mất điện, giờ ở tương lai) | `tests/browser-tests.html` | Trình duyệt T26 (mới) – ĐẠT |
+| 4 | Rules đề xuất viết lại gọn: đọc công khai 3 node, chặn mọi quyền ghi công khai (trạm thu dùng Database Secret nên vẫn ghi được) | `docs/firebase-rules-de-xuat.json`, `docs/GIAI-DOAN-1.1.md` | Chưa áp dụng – cần chủ Firebase |
 
 ## Giai đoạn 1.1 — 30/10/2026
 

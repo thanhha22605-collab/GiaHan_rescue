@@ -17,7 +17,7 @@ Phiên bản hiện tại: **Giai đoạn 1.1** – xem `CHANGELOG.md`.
 | `tests/browser-tests.html`, `tests/fake-firebase.js` | Kiểm thử app.js thật trên trình duyệt với Firebase giả lập |
 | `docs/GIAI-DOAN-1.md` | Phân tích ban đầu |
 | `docs/GIAI-DOAN-1.1.md` | Kết quả kiểm thử, triển khai, kiểm thử thiết bị thật, bảo mật |
-| `docs/firebase-rules-de-xuat.json` | Đề xuất Firebase Rules (chưa áp dụng) |
+| `docs/firebase-rules-de-xuat.json` | Firebase Rules đề xuất, dán thẳng vào Firebase Console (chưa áp dụng) |
 
 ## Nguyên tắc
 - Trang chỉ **đọc** Firebase: `/Monitoring`, `/DeviceStatus/connection`, `/gps`.

@@ -128,7 +128,7 @@ Không cần build. Nếu sau này đổi phiên bản Leaflet/Firebase/Font Awe
 
 ### Rủi ro không xử lý được bằng frontend
 
-1. **Quyền ghi Firebase:** database đang cho đọc công khai. Nếu Rules cho phép ghi công khai, bất kỳ ai cũng có thể sửa `sosState`, mực nước hoặc tọa độ. Frontend không ngăn được. Đề xuất Rules: `docs/firebase-rules-de-xuat.json` – **chỉ áp dụng sau khi biết gateway xác thực bằng cách nào** (xem ghi chú trong file).
+1. **Quyền đọc/ghi Firebase:** (cập nhật 13/11/2026) database hiện **từ chối mọi quyền đọc**, nên web không có dữ liệu. Firmware trạm thu ghi bằng Database Secret – loại khóa bỏ qua Rules – nên có thể áp dụng ngay `docs/firebase-rules-de-xuat.json`: cho đọc công khai 3 node web cần, chặn mọi quyền ghi công khai. Trạm thu vẫn ghi được. Chỉ chủ Firebase mới đổi được Rules (Firebase Console → Realtime Database → Rules).
 2. **Xác nhận SOS chỉ cục bộ:** không đồng bộ giữa nhiều người trực. Phương án đề xuất (chưa triển khai): bật Firebase Authentication cho người trực, thêm node mới `/SosAcks/{id}` = `{ by, at, note }` chỉ cho tài khoản người trực ghi, rules chặn mọi người khác; trang đọc node này để hiển thị "Ai đã tiếp nhận lúc nào". Việc này **không** sửa node hiện có.
 3. **Lịch sử, nhật ký chỉ cục bộ:** mỗi trình duyệt một bản, mất khi xóa dữ liệu trình duyệt, không phải hồ sơ sự cố dùng chung. Muốn có lịch sử chung cần gateway ghi thêm node lịch sử hoặc Cloud Function.
 4. **Không có giờ thực từ thiết bị:** `lastUpdate` là bộ đếm thời gian chạy. Trang suy ra "còn sống" bằng cách thấy nó thay đổi. Nếu gateway ghi thêm `updatedAt: {".sv":"timestamp"}` (chỉ thêm trường, không đổi trường cũ), trang sẽ tự dùng giờ máy chủ – chính xác hơn, kể cả ngay khi vừa mở trang.

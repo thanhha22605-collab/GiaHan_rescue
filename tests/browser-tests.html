@@ -272,6 +272,50 @@ const TESTS = [
         eq(st.history.length, 4, "Phải có thêm 1 điểm mỗi 60 giây");
         return "điểm lịch sử: " + st.history.length;
     }],
+    ["T26", "Vận hành với dữ liệu đúng như trạm thu v2 ghi (updatedAt + giờ máy chủ)", async () => {
+        clearStorage();
+        const w = await boot();
+        const pkt = (extra) => Object.assign({}, BASE, { updatedAt: w.Date.now() }, extra);
+        await emit(w, ".info/connected", true);
+        await emit(w, ".info/serverTimeOffset", 0);
+        // Trạm thu v2 khởi động: ghi DISCONNECT trước, rồi CONNECT khi có gói hợp lệ
+        await emit(w, "/DeviceStatus/connection", "DISCONNECT");
+        await emit(w, "/gps", null);
+        await emit(w, "/Monitoring", pkt({ lastUpdate: 5000 }));
+        eq(txt(w, "status-text"), "MẤT TÍN HIỆU", "Lúc trạm thu chưa nhận gói");
+        await emit(w, "/DeviceStatus/connection", "CONNECT");
+        await render(w);
+        // Có updatedAt hợp lệ → không cần chờ gói thứ hai mới xác minh
+        eq(txt(w, "status-text"), "AN TOÀN", "Snapshot có updatedAt mới");
+        eq(txt(w, "kpi-updated-sub"), "Theo giờ máy chủ", "Nguồn thời gian");
+        // SOS tự giữ: trạm phát gửi sos=1 liên tục
+        for (let i = 1; i <= 3; i++) { w.__advance(1000); await emit(w, "/Monitoring", pkt({ sosState: 1, statusText: "CAP CUU SOS!", lastUpdate: 5000 + i * 1000 })); }
+        eq(txt(w, "status-text"), "CẤP CỨU KHẨN CẤP (SOS)", "Đang SOS");
+        eq(txt(w, "status-detail"), "Thiết bị đang phát tín hiệu SOS.", "SOS phải là dữ liệu mới");
+        // Hủy SOS (giữ nút 3 giây) → gói mới sos=0
+        w.__advance(1000); await emit(w, "/Monitoring", pkt({ lastUpdate: 9000 }));
+        eq(txt(w, "status-text"), "SOS ĐÃ TẮT – CẦN XÁC MINH", "Sau khi hủy");
+        w.confirm = () => true;
+        w.document.getElementById("sos-ack-btn").click(); await sleep(10);
+        eq(txt(w, "status-text"), "AN TOÀN", "Sau khi người trực xác nhận");
+        // GPS chốt vệ tinh → trực tiếp; mất fix (NO_FIX,0,0) → vị trí tham khảo
+        w.__advance(1000); await emit(w, "/Monitoring", pkt({ lastUpdate: 10000, latitude: 20.149, longitude: 105.924 }));
+        check(txt(w, "gps-source").startsWith("GPS trực tiếp"), "GPS trực tiếp: " + txt(w, "gps-source"));
+        w.__advance(1000); await emit(w, "/Monitoring", pkt({ lastUpdate: 11000, gpsValid: false, latitude: 0, longitude: 0 }));
+        check(!txt(w, "gps-source").startsWith("GPS trực tiếp"), "Mất fix vẫn báo trực tiếp");
+        eq(w.document.getElementById("gmaps-link").getAttribute("aria-disabled"), "true", "Chỉ đường phải khóa khi mất fix");
+        // Trạm thu mất điện: không còn ghi gì → sau 15 giây phải MẤT TÍN HIỆU dù cờ vẫn CONNECT
+        w.__advance(14000); await render(w);
+        eq(txt(w, "status-text"), "AN TOÀN", "Mới 14 giây đã báo mất");
+        w.__advance(2000); await render(w);
+        eq(txt(w, "status-text"), "MẤT TÍN HIỆU", "16 giây không có dữ liệu");
+        eq(txt(w, "kpi-offline"), "1", "KPI offline");
+        // Dữ liệu ghi giờ ở tương lai (đồng hồ sai) → không coi là mới
+        await emit(w, "/Monitoring", pkt({ lastUpdate: 12000, updatedAt: w.Date.now() + 120000 }));
+        eq(txt(w, "status-text"), "THỜI GIAN DỮ LIỆU KHÔNG HỢP LỆ", "updatedAt ở tương lai");
+        eq(w.__errors.length, 0, "Có lỗi JS");
+        return "OK";
+    }],
     ["XSS", "Dữ liệu chứa HTML không được thực thi", async () => {
         const w = await boot();
         const evil = '<img src=x onerror="window.__pwned=1">';
