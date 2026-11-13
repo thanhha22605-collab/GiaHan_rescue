@@ -167,6 +167,8 @@
         if (tsCheck.ok) rec.ts = p.updatedAt;
         const last = state.history[state.history.length - 1];
         if (last && last.t >= t) return; // bảo đảm thứ tự thời gian tăng dần
+        // Mức không đổi và chưa đủ khoảng lấy mẫu → bỏ qua (giữ lịch sử dài, ít ghi localStorage)
+        if (last && last.v === rec.v && t - last.t < CFG.historySampleMs) return;
         state.history.push(rec);
         if (state.history.length > CFG.historyMax) state.history.splice(0, state.history.length - CFG.historyMax);
         saveJSON(KEY.history, state.history);

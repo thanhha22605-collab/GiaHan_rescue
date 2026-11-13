@@ -251,6 +251,27 @@ const TESTS = [
         eq(w.__errors.length, 0, "Có lỗi JS");
         return packets + " gói; lịch sử " + st.history.length + "/" + w.APP_CONFIG.historyMax + "; nhật ký " + st.log.length + "/" + w.APP_CONFIG.logMax + "; listener " + w.__fb.count();
     }],
+    ["T25", "Lịch sử chỉ ghi khi đổi mức hoặc mỗi phút", async () => {
+        clearStorage();
+        const w = await boot();
+        await online(w);                                    // gói mới đầu tiên: mức 0 → 1 điểm
+        const st = w.__rpDebug.state;
+        eq(st.history.length, 1, "Sau gói đầu");
+        for (let i = 3; i < 33; i++) {                      // 30 gói, 1 giây/gói, mức giữ nguyên
+            w.__advance(1000);
+            w.__fb.set("/Monitoring", Object.assign({}, BASE, { lastUpdate: i }));
+        }
+        eq(st.history.length, 1, "Mức không đổi trong 30 giây vẫn ghi thêm");
+        w.__advance(1000);
+        w.__fb.set("/Monitoring", Object.assign({}, BASE, { waterLevel: 2, lastUpdate: 40 }));
+        eq(st.history.length, 2, "Đổi mức không được ghi");
+        for (let i = 41; i < 41 + 125; i++) {               // 125 giây giữ mức 2
+            w.__advance(1000);
+            w.__fb.set("/Monitoring", Object.assign({}, BASE, { waterLevel: 2, lastUpdate: i }));
+        }
+        eq(st.history.length, 4, "Phải có thêm 1 điểm mỗi 60 giây");
+        return "điểm lịch sử: " + st.history.length;
+    }],
     ["XSS", "Dữ liệu chứa HTML không được thực thi", async () => {
         const w = await boot();
         const evil = '<img src=x onerror="window.__pwned=1">';

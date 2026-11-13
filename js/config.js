@@ -25,10 +25,11 @@ window.APP_CONFIG = {
         danger: 3
     },
 
-    // Heartbeat: nếu không thấy dữ liệu mới (lastUpdate thay đổi) trong khoảng này
-    // thì coi thiết bị MẤT TÍN HIỆU. Nên đặt ≈ 3 lần chu kỳ gửi của thiết bị.
-    // CẦN XÁC NHẬN chu kỳ gửi thực tế của trạm LoRa.
-    heartbeatTimeoutMs: 60000,
+    // Heartbeat: nếu không thấy dữ liệu mới (lastUpdate/updatedAt) trong khoảng này
+    // thì coi thiết bị MẤT TÍN HIỆU.
+    // Theo firmware: trạm phát gửi mỗi 1 giây, trạm thu báo DISCONNECT sau 3 giây không có gói.
+    // 15 giây chừa dư cho trễ ghi Firebase và mạng.
+    heartbeatTimeoutMs: 15000,
 
     // Sai lệch đồng hồ cho phép khi kiểm tra timestamp (updatedAt, dữ liệu lưu cục bộ).
     // Timestamp nằm trong tương lai quá ngưỡng này bị coi là không hợp lệ.
@@ -41,6 +42,9 @@ window.APP_CONFIG = {
 
     // Giới hạn dữ liệu lưu cục bộ trên trình duyệt
     historyMax: 500,
+    // Lịch sử mực nước: chỉ ghi khi mức thay đổi, hoặc thêm 1 điểm sau mỗi khoảng này nếu mức giữ nguyên.
+    // (Trạm gửi 1 gói/giây – ghi mọi gói thì 500 điểm chỉ đủ khoảng 8 phút.)
+    historySampleMs: 60000,
     logMax: 150,
     storagePrefix: "rp_",
 

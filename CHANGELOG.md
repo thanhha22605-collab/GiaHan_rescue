@@ -1,5 +1,14 @@
 # Nhật ký thay đổi
 
+## Giai đoạn 1.2 — 13/11/2026
+
+Chỉnh web cho khớp firmware thật (trạm phát gửi mỗi 1 giây, trạm thu báo DISCONNECT sau 3 giây).
+
+| # | Thay đổi | File | Kiểm thử |
+|---|----------|------|----------|
+| 1 | Thời gian chờ mất nhịp 60 giây → 15 giây | `js/config.js` | Node 24/24, trình duyệt T09, T20 – ĐẠT |
+| 2 | Lịch sử mực nước chỉ ghi khi mức đổi, hoặc 1 điểm mỗi 60 giây (`historySampleMs`). Trước đây ghi mọi gói nên 500 điểm chỉ đủ ~8 phút | `js/config.js`, `js/app.js` | Trình duyệt T25 (mới), T24 – ĐẠT |
+
 ## Giai đoạn 1.1 — 30/10/2026
 
 Sửa lỗi an toàn và ổn định trên nền code Giai đoạn 1 + Dashboard kính. Không đổi node Firebase, không ghi Firebase, không cần sửa firmware, không cần build.
