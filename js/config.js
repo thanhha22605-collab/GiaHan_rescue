@@ -6,7 +6,7 @@
 // -------------------------------------------------------------
 window.APP_CONFIG = {
     firebase: {
-        databaseURL: "https://map-1dc88-default-rtdb.firebaseio.com/"
+        databaseURL: "https://tram-canh-bao-thien-tai-default-rtdb.asia-southeast1.firebasedatabase.app/"
     },
 
     // Đường dẫn dữ liệu hiện có trên Firebase (giữ nguyên, không đổi cấu trúc)
